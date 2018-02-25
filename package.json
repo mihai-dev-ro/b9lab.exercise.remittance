@@ -1,0 +1,17 @@
+{
+  "name": "b9lab.exercise.remittance",
+  "version": "0.0.1",
+  "description": "Remittance project in Module 5",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "bluebird": "^3.5.1"
+  }
+}
