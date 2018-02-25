@@ -1,4 +1,4 @@
-### B8Lab Exercise 2 - Remittance smart contract
+### B9Lab Exercise 2 - Remittance smart contract
 
 You will create a smart contract named Remittance whereby:
 
