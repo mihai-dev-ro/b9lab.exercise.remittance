@@ -3,52 +3,68 @@ pragma solidity ^0.4.18;
 contract Remittance {
 
     address public owner;
-    address public exchange;
     bytes32 puzzle;    
     uint nonce = 0; //# of attempts to withdraw
+    uint deadline; //nb of block until the remittance is active
+    bool isRunning = true;
+
+    uint constant DURATION_MAX = 1000; 
     
     event LogWithdrawalSuccess(address indexed exchange, uint256 value);
-    event LogWithdrawalFailed(string exchangeSecret, string beneficiarySecret);
+    event LogWithdrawalFailed(
+        address indexed exchange, 
+        string beneficiarySecret
+    );
+    event LogRefundSuccess(address indexed recipient, uint value);
+    event LogRunningFlagChanged(address indexed sender, bool value);
 
     function Remittance(
-        address exchangeAddress,
-        string exchangeSecret,
-        string beneficiarySecret
+        bytes32 puzzleHash,
+        uint deadlineBlockNumber        
     ) 
         public
         payable
     {
         // minimum validation of params
-        require(exchangeAddress != 0x0);        
-        require(exchangeAddress != msg.sender);
         require(msg.value > 0);
 
+        // limit to how far in the future the deadline can be
+        require(deadlineBlockNumber <= (block.number + DURATION_MAX));
+
         owner = msg.sender;
-        exchange = exchangeAddress;
-        
+        deadline = deadlineBlockNumber;
+
         // set the puzzle
-        puzzle = keccak256(bytes(exchangeSecret),
-            bytes(beneficiarySecret));
+        puzzle = puzzleHash;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+
+        _;
+    }
+
+    modifier onlyIfRunning() {
+        require(isRunning);
+
+        _;
     }
 
     function withdraw(
-        string exchangeSecret,
         string beneficiarySecret
     )
         public
+        onlyIfRunning
     {
-        // only exchange can withdraw the money
-        require(msg.sender == exchange);
-
         // this is not the first attempt to use the secrets, revert
         require(nonce == 0); 
         nonce++;
         
         // calculate the keccak256 hash 
-        // of the concatenation of the two secrets
+        // of the concatenation of the exchange's address and beneficiarySecret
         // and verifies agains the puzzle
         if(keccak256(
-            bytes(exchangeSecret), 
+            msg.sender, 
             bytes(beneficiarySecret)
             ) == puzzle) {
         
@@ -57,9 +73,28 @@ contract Remittance {
             // log the event
             LogWithdrawalSuccess(msg.sender, amount);        
         } else {
-            LogWithdrawalFailed(exchangeSecret, beneficiarySecret);
+            LogWithdrawalFailed(msg.sender, beneficiarySecret);
         }
-
         
     }
+
+    function sendRefund() public onlyOwner onlyIfRunning {
+        uint amount = this.balance;
+        if(hasFailed()) {
+            msg.sender.transfer(this.balance);
+            LogRefundSuccess(msg.sender, amount);
+        }
+    }
+
+    function setRunningFlag(bool value) public onlyOwner {
+        require(isRunning != value);
+
+        isRunning = value;
+        LogRunningFlagChanged(msg.sender, value);
+    }
+
+    function hasFailed() private view returns(bool) {
+        return ((block.number > deadline) || 
+            (nonce > 0 && this.balance > 0));
+    } 
 }
