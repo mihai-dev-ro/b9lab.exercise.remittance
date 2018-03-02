@@ -1,5 +1,7 @@
 pragma solidity ^0.4.18;
 
+import "./CryptoLib.sol";
+
 contract Remittance {
 
     address public owner;
@@ -10,12 +12,8 @@ contract Remittance {
 
     uint constant DURATION_MAX = 1000; 
     
-    event LogWithdrawalSuccess(address indexed exchange, uint256 value);
-    event LogWithdrawalFailed(
-        address indexed exchange, 
-        string beneficiarySecret
-    );
-    event LogRefundSuccess(address indexed recipient, uint value);
+    event LogWithdrawal(address indexed exchange, uint256 value);
+    event LogRefund(address indexed recipient, uint value);
     event LogRunningFlagChanged(address indexed sender, bool value);
 
     function Remittance(
@@ -63,17 +61,14 @@ contract Remittance {
         // calculate the keccak256 hash 
         // of the concatenation of the exchange's address and beneficiarySecret
         // and verifies agains the puzzle
-        if(keccak256(
-            msg.sender, 
-            bytes(beneficiarySecret)
-            ) == puzzle) {
-        
+        if(CryptoLib.isPuzzleSolved(puzzle, msg.sender, beneficiarySecret)) {
+            
             uint amount = this.balance;
             msg.sender.transfer(this.balance);
             // log the event
-            LogWithdrawalSuccess(msg.sender, amount);        
+            LogWithdrawal(msg.sender, amount);        
         } else {
-            LogWithdrawalFailed(msg.sender, beneficiarySecret);
+            revert();
         }
         
     }
@@ -82,8 +77,8 @@ contract Remittance {
         uint amount = this.balance;
         if(hasFailed()) {
             msg.sender.transfer(this.balance);
-            LogRefundSuccess(msg.sender, amount);
-        }
+            LogRefund(msg.sender, amount);
+        } 
     }
 
     function setRunningFlag(bool value) public onlyOwner {
