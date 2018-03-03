@@ -10,16 +10,10 @@ module.exports = function(deployer, network, accounts) {
     return deployer.then(() => {
         return deployer.deploy(CryptoLib);
     }).then(() => {
-        deployer.link(CryptoLib, Remittance);
+        return deployer.link(CryptoLib, Remittance);
     }).then(() => {
-        return CryptoLib.deployed();
-    }).then(instance => {
-        return instance.createPuzzle(exchangeAddress, beneficiarySecret);
-    }).then(puzzleHash => {
-        deployer.deploy(
+        return deployer.deploy(
             Remittance, 
-            puzzleHash, 
-            deadline, 
-            {from: accounts[0], value: 100, gas: 1000000});
+            {from: accounts[0], gas: 1000000});
     });
 };
