@@ -1,68 +1,60 @@
-var CryptoLib = artifacts.require("CryptoLib");
-var Remittance = artifacts.require("Remittance");
-var Promise = require("bluebird");
+const Remittance = artifacts.require("Remittance");
+const Promise = require("bluebird");
 Promise.promisifyAll(web3.eth, {suffix: "Promise"});
-var expectedExceptionPromise = require("./expected_exception_testRPC_and_geth.js");
+const expectedExceptionPromise = require("./expected_exception_testRPC_and_geth.js");
 
 contract("Remittance", (accounts) => {
 
-    
     describe("validate deposit of new remitatnce", () => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
         let transferredAmount = 100;
-        let beneficiarySecret = "Secret beneficiary";
+        let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
-        let instanceCryptoLib;
 
         beforeEach("deploy and prepare", () => {
-            return CryptoLib.new().then((instanceLib) => {
-                    instanceCryptoLib = instanceLib;
-
-                    return Remittance.link("CryptoLib", instanceLib.address);
-                }).then(() => {
-                    return Remittance.new({from: accounts[0]});
-                }).then(_instance => {
-                    instance = _instance;
-                });
+            return Remittance.new({from: accounts[0]})
+            .then(_instance => {
+                instance = _instance;
+            });
         });
 
         it("should be able to deposit new remittance", () => {
-            return instanceCryptoLib.createPuzzle(
-                    exchangeAddress, 
-                    beneficiarySecret
-                ).then(puzzleHash => {
-                    return instance.depositNew(
-                        puzzleHash, 
-                        deadline, 
-                        {from: remittanceOwnerAddress, value: transferredAmount})
-                }).then(txObj => {
-                    assert.equal(
-                        parseInt(txObj.receipt.status), 
-                        1, 
-                        "The depositNew transaction completed successfully"
-                    );
+            return instance.createPuzzle(
+                exchangeAddress, 
+                beneficiarySecret
+            ).then(puzzleHash => {
+                return instance.depositNew(
+                    puzzleHash, 
+                    deadline, 
+                    {from: remittanceOwnerAddress, value: transferredAmount})
+            }).then(txObj => {
+                assert.equal(
+                    parseInt(txObj.receipt.status), 
+                    1, 
+                    "The depositNew transaction completed successfully"
+                );
 
-                    assert.equal(
-                        txObj.logs[0].event, 
-                        "LogNew", 
-                        "LogNew event was successfully fired"
-                    );
+                assert.equal(
+                    txObj.logs[0].event, 
+                    "LogNew", 
+                    "LogNew event was successfully fired"
+                );
 
-                    assert.equal(
-                        txObj.logs[0].args["value"],
-                        transferredAmount.toString(10),
-                        "LogNew event correctly saved the transferred amount"
-                    );
+                assert.equal(
+                    txObj.logs[0].args["value"],
+                    transferredAmount.toString(10),
+                    "LogNew event correctly saved the transferred amount"
+                );
 
-                    assert.equal(
-                        txObj.logs[0].args["remittanceOwner"],
-                        remittanceOwnerAddress,
-                        "LogNew event correctly saved the remittance owner"
-                    );
+                assert.equal(
+                    txObj.logs[0].args["remittanceOwner"],
+                    remittanceOwnerAddress,
+                    "LogNew event correctly saved the remittance owner"
+                );
 
-                });
+            });
         });
 
     });
@@ -72,49 +64,45 @@ contract("Remittance", (accounts) => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
         let transferredAmount = 100;
-        let beneficiarySecret = "Secret beneficiary";
+        let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
-        let instanceCryptoLib;
 
         beforeEach("deploy and prepare", () => {
-            return CryptoLib.new().then((instanceLib) => {
-                    instanceCryptoLib = instanceLib;
+            return Remittance.new({from: accounts[0]})
+            .then(_instance => {
+                instance = _instance;
 
-                    return Remittance.link("CryptoLib", instanceLib.address);
-                }).then(() => {
-                    return Remittance.new({from: accounts[0]});
-                }).then(_instance => {
-                    instance = _instance;
-
-                    return instanceCryptoLib.createPuzzle(
-                        exchangeAddress,
-                        beneficiarySecret
-                    );
-                }).then(puzzleHash => {
-                    return instance.depositNew(
-                        puzzleHash,
-                        deadline,
-                        {
-                            from: remittanceOwnerAddress, 
-                            value: transferredAmount
-                        }
-                    );
-                });
+                return instance.createPuzzle(
+                    exchangeAddress,
+                    beneficiarySecret
+                );
+            }).then(puzzleHash => {
+                return instance.depositNew(
+                    puzzleHash,
+                    deadline,
+                    {
+                        from: remittanceOwnerAddress, 
+                        value: transferredAmount
+                    }
+                );
+            });
         });
 
         it("should be able to query the contract for recorded " + 
             "remittances' balance", () => {
 
-            return instance.getBalanceOf(remittanceOwnerAddress)
-                .then(balance => {
-                    assert.equal(
-                        balance.toString(10),
-                        transferredAmount.toString(10),
-                        "The remittance's balance should have the " + 
-                        "transferred value"
-                    );
-                });        
+            return instance.getRemittanceFor(
+                exchangeAddress, 
+                beneficiarySecret
+            ).then(balance => {
+                assert.equal(
+                    balance.toString(10),
+                    transferredAmount.toString(10),
+                    "The remittance's balance should have the " + 
+                    "transferred value"
+                );
+            });        
         });
     });
 
@@ -123,35 +111,29 @@ contract("Remittance", (accounts) => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
         let transferredAmount = 100;
-        let beneficiarySecret = "Secret beneficiary";
+        let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
-        let instanceCryptoLib;
 
         beforeEach("deploy and prepare", () => {
-            return CryptoLib.new().then((instanceLib) => {
-                    instanceCryptoLib = instanceLib;
+            return Remittance.new({from: accounts[0]})
+            .then(_instance => {
+                instance = _instance;
 
-                    return Remittance.link("CryptoLib", instanceLib.address);
-                }).then(() => {
-                    return Remittance.new({from: accounts[0]});
-                }).then(_instance => {
-                    instance = _instance;
-
-                    return instanceCryptoLib.createPuzzle(
-                        exchangeAddress,
-                        beneficiarySecret
-                    );
-                }).then(puzzleHash => {
-                    return instance.depositNew(
-                        puzzleHash,
-                        deadline,
-                        {
-                            from: remittanceOwnerAddress, 
-                            value: transferredAmount
-                        }
-                    );
-                });
+                return instance.createPuzzle(
+                    exchangeAddress,
+                    beneficiarySecret
+                );
+            }).then(puzzleHash => {
+                return instance.depositNew(
+                    puzzleHash,
+                    deadline,
+                    {
+                        from: remittanceOwnerAddress, 
+                        value: transferredAmount
+                    }
+                );
+            });
         });
 
         it("should be able to withdraw the ether from the " + 
@@ -163,54 +145,57 @@ contract("Remittance", (accounts) => {
             let withdrawGasPrice = 20000000;
 
             return web3.eth.getBalancePromise(exchangeAddress)
-                .then(balance => {
+            .then(balance => {
 
-                    exchangeBalanceBefore = balance;
+                exchangeBalanceBefore = balance;
 
-                    return instance.withdraw(
-                        remittanceOwnerAddress,
-                        beneficiarySecret, 
-                        {
-                            from: exchangeAddress, 
-                            gas: 100000, 
-                            gasPrice: withdrawGasPrice
-                        }
-                    );
-                }).then(txObj => {
+                return instance.withdraw(
+                    remittanceOwnerAddress,
+                    beneficiarySecret, 
+                    {
+                        from: exchangeAddress, 
+                        gas: 100000, 
+                        gasPrice: withdrawGasPrice
+                    }
+                );
+            }).then(txObj => {
 
-                    assert.strictEqual(parseInt(txObj.receipt.status), 1, 
-                        "The transaction has been completed successfully");
+                assert.strictEqual(parseInt(txObj.receipt.status), 1, 
+                    "The transaction has been completed successfully");
 
-                    assert.equal(txObj.logs[0].event, "LogWithdrawal", 
-                        "The event LogWithdrawal was fired");                    
-                    assert.equal(txObj.logs[0].args["value"].toString(10), 
-                        transferredAmount.toString(10), 
-                        "The event LogWithdrawal recorded correctly the transferred value");
+                assert.equal(txObj.logs[0].event, "LogWithdrawal", 
+                    "The event LogWithdrawal was fired");                    
+                assert.equal(txObj.logs[0].args["value"].toString(10), 
+                    transferredAmount.toString(10), 
+                    "The event LogWithdrawal recorded correctly the transferred value");
 
-                    // retrieve the gas used & gas price
-                    withdrawGasUsed = txObj.receipt.gasUsed;
+                // retrieve the gas used & gas price
+                withdrawGasUsed = txObj.receipt.gasUsed;
 
-                    return instance.getBalanceOf(remittanceOwnerAddress);
+                return instance.getRemittanceFor(
+                    exchangeAddress, 
+                    beneficiarySecret
+                );
 
-                }).then((balance) => {
+            }).then((balance) => {
 
-                    assert.equal(balance.toString(), "0", "the remittance's " +
-                        "balance is zero");
+                assert.equal(balance.toString(), "0", "the remittance's " +
+                    "balance is zero");
 
-                    return web3.eth.getBalancePromise(exchangeAddress);
-                }).then(exchangeBalanceAfter => {
+                return web3.eth.getBalancePromise(exchangeAddress);
+            }).then(exchangeBalanceAfter => {
 
-                    assert.equal(
-                        exchangeBalanceAfter
-                            .minus(exchangeBalanceBefore)
-                            .plus((new web3.BigNumber(withdrawGasUsed))
-                                .times(new web3.BigNumber(withdrawGasPrice)
-                                )
+                assert.equal(
+                    exchangeBalanceAfter
+                        .minus(exchangeBalanceBefore)
+                        .plus((new web3.BigNumber(withdrawGasUsed))
+                            .times(new web3.BigNumber(withdrawGasPrice)
                             )
-                            .toString(10),
-                        transferredAmount.toString(10),
-                        "The amount has successfull arrived into the Exchange's account");
-                });    
+                        )
+                        .toString(10),
+                    transferredAmount.toString(10),
+                    "The amount has successfull arrived into the Exchange's account");
+            });    
         });
 
         it("should not be able to withdraw funds when contract is executed " +

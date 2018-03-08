@@ -1,14 +1,11 @@
 pragma solidity ^0.4.18;
 
-import "./CryptoLib.sol";
-
 contract Remittance {
 
     struct Record {
+        address owner;
         uint balance;
-        bytes32 puzzle; // puzzle to be solved for accessing the money
         uint deadline; //nb of block until the remittance is active
-        uint8 nonce; //# of attempts to withdraw
     }
 
     address public owner;
@@ -16,7 +13,7 @@ contract Remittance {
 
     uint constant DURATION_MAX = 1000; 
 
-    mapping(address => Record) remittanceOf;
+    mapping(bytes32 => Record) remittances;
     
     event LogNew(
         address indexed remittanceOwner, 
@@ -44,6 +41,17 @@ contract Remittance {
         _;
     }
 
+    function createPuzzle(
+        address addr, 
+        bytes32 secret
+    ) 
+        public 
+        pure 
+        returns(bytes32)
+    {
+        return keccak256(addr, secret);
+    }
+
     function depositNew(
         bytes32 puzzleHash, 
         uint deadlineBlockNumber
@@ -57,11 +65,15 @@ contract Remittance {
         // limit to how far in the future the deadline can be
         require(deadlineBlockNumber <= (block.number + DURATION_MAX));
 
-        remittanceOf[msg.sender] = Record(
+        // make sure there is no collision with previously recorded remittance
+        Record storage remittanceRecord = remittances[puzzleHash];
+        require(remittanceRecord.owner == 0x0);
+
+        // record 
+        remittances[puzzleHash] = Record(
+            msg.sender,
             msg.value, 
-            puzzleHash, 
-            deadlineBlockNumber, 
-            0
+            deadlineBlockNumber
         );
 
         // log event
@@ -70,68 +82,71 @@ contract Remittance {
 
     function withdraw(
         address remittanceOwner,
-        string beneficiarySecret
+        bytes32 beneficiarySecret
     )
         public
         onlyIfRunning
     {
-        // if not money registered at the remittanceOwner's address, revert
-        require(remittanceOf[remittanceOwner].balance > 0);
+        // retrieve the remittance
+        Record storage remittanceRecord = remittances[
+            createPuzzle(msg.sender, beneficiarySecret)
+        ];
 
-        // assign the mapping value to a local storage pointer 
-        Record storage record = remittanceOf[remittanceOwner];
+        // if the remittance is not owned by the remittanceOwner then revert
+        require(remittanceRecord.owner == remittanceOwner);
 
-        // this is not the first attempt to use the secrets, revert
-        require(record.nonce == 0); 
-        record.nonce ++;
-        
+        // if not money registered at the remittanceOwner's address 
+        // with this secret then revert
+        require(remittanceRecord.balance > 0);
 
-        // calculate the keccak256 hash 
-        // of the concatenation of the exchange's address and beneficiarySecret
-        // and verifies agains the puzzle
-        if(CryptoLib.isPuzzleSolved(
-            record.puzzle, 
-            msg.sender, 
-            beneficiarySecret)
-        ) {  
-            // implement Checks-Effects-Interractions security pattern
-            uint amount = record.balance;
-            record.balance = 0;
-            msg.sender.transfer(amount);
-
-            // log the event
-            LogWithdrawal(msg.sender, amount);        
-        } else {
-            revert();
-        }
-        
+        // all good so far, transfer the money
+        // implement Checks-Effects-Interractions security pattern
+        uint amount = remittanceRecord.balance;
+        remittanceRecord.balance = 0;
+        LogWithdrawal(msg.sender, amount);             
+        msg.sender.transfer(amount);
     }
 
-    function getBalanceOf(
-        address remittanceOwner
+    function getRemittanceFor(
+        address exchange,
+        bytes32 beneficiarySecret
     )
         public
         view
+        onlyIfRunning
         returns(uint)
     {
-        return remittanceOf[remittanceOwner].balance;
+        return remittances[
+            createPuzzle(exchange, beneficiarySecret)
+        ].balance;
     }
 
-    function sendRefund() public onlyIfRunning {
+    function sendRefund(
+        address exchange, 
+        bytes32 beneficiarySecret
+    ) 
+        public 
+        onlyIfRunning 
+    {
+        // retrieve the remittance
+        Record storage remittanceRecord = remittances[
+            createPuzzle(exchange, beneficiarySecret)
+        ];
+
+        // if the remittance is not owned by the sender then revert
+        require(remittanceRecord.owner == msg.sender);
+
         // if not money registered at the remittanceOwner's address, revert
-        require(remittanceOf[msg.sender].balance > 0);
+        require(remittanceRecord.balance > 0);
 
-        // assign the mapping value to a local storage pointer  
-        Record storage record = remittanceOf[msg.sender];
-
-        uint amount = record.balance;
-        if(block.number > record.deadline || 
-            (record.nonce > 0 && record.balance > 0)
+        uint amount = remittanceRecord.balance;
+        if((block.number > remittanceRecord.deadline) || 
+            (remittanceRecord.balance > 0)
         ) {
 
-            record.balance = 0;
-            msg.sender.transfer(amount);
+            remittanceRecord.balance = 0;
             LogRefund(msg.sender, amount);
+            msg.sender.transfer(amount);
         } 
     }
 
