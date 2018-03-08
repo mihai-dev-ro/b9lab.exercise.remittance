@@ -13,6 +13,10 @@ contract Remittance {
 
     uint constant DURATION_MAX = 1000; 
 
+    // the cost of deployment is 682580
+    uint constant WITHDRAWAL_FEE_GAS = 650000; 
+
+    uint balanceOfServiceFees;
     mapping(bytes32 => Record) remittances;
     
     event LogNew(
@@ -21,7 +25,8 @@ contract Remittance {
         bytes32 puzzle, 
         uint deadline
     );
-    event LogWithdrawal(address indexed exchange, uint value);
+    event LogWithdrawal(address indexed exchange, uint value, uint serviceFee);
+    event LogServiceFeesWithdrawal(uint value);
     event LogRefund(address indexed recipient, uint value);
     event LogRunningFlagChanged(address indexed sender, bool value);
 
@@ -99,11 +104,22 @@ contract Remittance {
         // with this secret then revert
         require(remittanceRecord.balance > 0);
 
+        // calculate withdrawal fee
+        uint txFee = WITHDRAWAL_FEE_GAS * tx.gasprice;
+
         // all good so far, transfer the money
         // implement Checks-Effects-Interractions security pattern
-        uint amount = remittanceRecord.balance;
+        uint amount = remittanceRecord.balance - txFee;
         remittanceRecord.balance = 0;
-        LogWithdrawal(msg.sender, amount);             
+        balanceOfServiceFees += txFee;
+        LogWithdrawal(msg.sender, amount, txFee);             
+        msg.sender.transfer(amount);
+    }
+
+    function withdrawServiceFees() public onlyOwner onlyIfRunning {
+        uint amount = balanceOfServiceFees;
+        balanceOfServiceFees = 0;
+        LogServiceFeesWithdrawal(amount);
         msg.sender.transfer(amount);
     }
 
@@ -119,6 +135,10 @@ contract Remittance {
         return remittances[
             createPuzzle(exchange, beneficiarySecret)
         ].balance;
+    }
+
+    function getServiceFees() onlyIfRunning returns(uint) {
+        return balanceOfServiceFees;
     }
 
     function sendRefund(

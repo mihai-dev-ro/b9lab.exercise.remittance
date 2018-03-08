@@ -8,7 +8,7 @@ contract("Remittance", (accounts) => {
     describe("validate deposit of new remitatnce", () => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
-        let transferredAmount = 100;
+        let transferredAmount = web3.toWei(0.5, "ether");
         let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
@@ -63,7 +63,7 @@ contract("Remittance", (accounts) => {
     describe("validate query the contract", () => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
-        let transferredAmount = 100;
+        let transferredAmount = web3.toWei(0.01, "ether");
         let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
@@ -110,7 +110,7 @@ contract("Remittance", (accounts) => {
     describe("validate withdrawal of remittance funds", () => {
         let remittanceOwnerAddress = accounts[1];
         let exchangeAddress = accounts[2];
-        let transferredAmount = 100;
+        let transferredAmount = web3.toWei(0.5, "ether");
         let beneficiarySecret = web3.fromUtf8("Secret beneficiary", 32);
         let deadline = 10;
         let instance;
@@ -143,6 +143,7 @@ contract("Remittance", (accounts) => {
             let exchangeBalanceBefore;
             let withdrawGasUsed;
             let withdrawGasPrice = 20000000;
+            let withdrawFee;
 
             return web3.eth.getBalancePromise(exchangeAddress)
             .then(balance => {
@@ -165,12 +166,16 @@ contract("Remittance", (accounts) => {
 
                 assert.equal(txObj.logs[0].event, "LogWithdrawal", 
                     "The event LogWithdrawal was fired");                    
-                assert.equal(txObj.logs[0].args["value"].toString(10), 
+                assert.equal(txObj.logs[0].args["value"]
+                    .plus(txObj.logs[0].args["serviceFee"])
+                    .toString(10), 
                     transferredAmount.toString(10), 
                     "The event LogWithdrawal recorded correctly the transferred value");
-
+            
                 // retrieve the gas used & gas price
                 withdrawGasUsed = txObj.receipt.gasUsed;
+                // get the withdraw transaction fee
+                withdrawFee = txObj.logs[0].args["serviceFee"];
 
                 return instance.getRemittanceFor(
                     exchangeAddress, 
@@ -192,6 +197,7 @@ contract("Remittance", (accounts) => {
                             .times(new web3.BigNumber(withdrawGasPrice)
                             )
                         )
+                        .plus(withdrawFee)
                         .toString(10),
                     transferredAmount.toString(10),
                     "The amount has successfull arrived into the Exchange's account");
