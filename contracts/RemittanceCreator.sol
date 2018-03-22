@@ -1,12 +1,10 @@
 pragma solidity ^0.4.18;
 
+import "./Pausable.sol";
 import "./RemittanceOwned.sol";
 
 
-contract RemittanceCreator {
-
-    address public owner;
-    bool isRunning = true;
+contract RemittanceCreator is Pausable {
 
     uint constant DURATION_MAX = 1000; 
 
@@ -22,23 +20,8 @@ contract RemittanceCreator {
         uint deadline
     );
     event LogWithdrawal(address indexed sender, uint value);
-    event LogRunningFlagChanged(address indexed sender, bool value);
 
-    function Remittance() public {
-        owner = msg.sender;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner);
-
-        _;
-    }
-
-    modifier onlyIfRunning() {
-        require(isRunning);
-
-        _;
-    }
+    function Remittance() public {}
 
     function createPuzzle(
         address remittanceOwner, 
@@ -99,13 +82,6 @@ contract RemittanceCreator {
         uint amount = this.balance;
         LogWithdrawal(msg.sender, amount);
         msg.sender.transfer(amount);
-    }
-
-    function setRunningFlag(bool value) public onlyOwner {
-        require(isRunning != value);
-
-        isRunning = value;
-        LogRunningFlagChanged(msg.sender, value);
     }
 
 }
