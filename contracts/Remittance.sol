@@ -57,6 +57,9 @@ contract Remittance is Pausable{
         returns(bool successful) 
     {
 
+        // deadline must be a positive number
+        require(0 < deadlineBlockNumber);
+
         // limit to how far in the future the deadline can be
         require(deadlineBlockNumber <= (block.number + DURATION_MAX));
 
