@@ -147,7 +147,9 @@ contract("Remittance", (accounts) => {
                     beneficiaryAddress,
                     beneficiarySecret
                 );
-            }).then(puzzleHash => {
+            }).then(hash => {
+                puzzleHash = hash;
+
                 return instance.depositNew(
                     puzzleHash,
                     deadline,
@@ -212,12 +214,12 @@ contract("Remittance", (accounts) => {
                 assert.equal(balance.toString(), "0", "the remittance's " +
                     "balance is zero");
 
-                return web3.eth.getBalancePromise(exchangeAddress);
-            }).then(exchangeBalanceAfter => {
+                return web3.eth.getBalancePromise(beneficiaryAddress);
+            }).then(beneficiaryBalanceAfter => {
 
                 assert.equal(
-                    exchangeBalanceAfter
-                        .minus(exchangeBalanceBefore)
+                    beneficiaryBalanceAfter
+                        .minus(beneficiaryBalanceBefore)
                         .plus(withdrawTxCost)
                         .toString(10),
                     remittanceAmount.toString(10),
